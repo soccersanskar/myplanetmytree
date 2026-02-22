@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
 import MissionSection from "@/components/MissionSection";
-import TreesSection from "@/components/TreesSection";
 import DonationSection from "@/components/DonationSection";
 import ContactSection from "@/components/ContactSection";
 import Footer from "@/components/Footer";
-import { CheckCircle, X } from "lucide-react";
+import { CheckCircle, X, TreePine } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -16,7 +16,6 @@ const Index = () => {
   useEffect(() => {
     if (searchParams.get("donation") === "success") {
       setShowBanner(true);
-      // Clean the URL
       searchParams.delete("donation");
       setSearchParams(searchParams, { replace: true });
     }
@@ -38,7 +37,26 @@ const Index = () => {
       <Navbar />
       <HeroSection />
       <MissionSection />
-      <TreesSection />
+
+      {/* Trees CTA */}
+      <section className="py-24 bg-card">
+        <div className="container mx-auto px-6 text-center max-w-2xl">
+          <TreePine className="h-12 w-12 text-primary mx-auto mb-6" />
+          <h2 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-6">
+            Discover Why Trees Matter
+          </h2>
+          <p className="text-muted-foreground text-lg leading-relaxed mb-8">
+            From carbon sequestration to human health, trees are the planet's most powerful natural technology. Dive into the science.
+          </p>
+          <Button asChild size="lg" className="text-base px-8">
+            <Link to="/about-trees">
+              <TreePine className="h-5 w-5 mr-2" />
+              Read About Trees
+            </Link>
+          </Button>
+        </div>
+      </section>
+
       <DonationSection />
       <ContactSection />
       <Footer />
