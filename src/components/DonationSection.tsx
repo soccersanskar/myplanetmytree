@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { TreePine, Trees, Mountain, Check, CreditCard, Lock } from "lucide-react";
+import { TreePine, Trees, Mountain, Check, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const plans = [
   {
@@ -48,13 +49,13 @@ const plans = [
   },
 ];
 
-type Step = "plans" | "details" | "payment" | "success";
+type Step = "plans" | "details";
 
 const DonationSection = () => {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("plans");
   const [formData, setFormData] = useState({ name: "", email: "", dedication: "" });
-  const [paymentData, setPaymentData] = useState({ cardName: "", cardNumber: "", expiry: "", cvv: "" });
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   const selectedPlanData = plans.find((p) => p.id === selectedPlan);
@@ -64,7 +65,7 @@ const DonationSection = () => {
     setStep("details");
   };
 
-  const handleDetailsSubmit = (e: React.FormEvent) => {
+  const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.email.trim()) {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
@@ -75,49 +76,30 @@ const DonationSection = () => {
       toast({ title: "Please enter a valid email address", variant: "destructive" });
       return;
     }
-    setStep("payment");
-  };
 
-  const formatCardNumber = (value: string) => {
-    const digits = value.replace(/\D/g, "").slice(0, 16);
-    return digits.replace(/(.{4})/g, "$1 ").trim();
-  };
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-donation-checkout", {
+        body: {
+          planId: selectedPlan,
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          dedication: formData.dedication.trim(),
+        },
+      });
 
-  const formatExpiry = (value: string) => {
-    const digits = value.replace(/\D/g, "").slice(0, 4);
-    if (digits.length > 2) return digits.slice(0, 2) + "/" + digits.slice(2);
-    return digits;
-  };
-
-  const handlePaymentSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cardDigits = paymentData.cardNumber.replace(/\s/g, "");
-    if (!paymentData.cardName.trim()) {
-      toast({ title: "Please enter the cardholder name", variant: "destructive" });
-      return;
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, "_blank");
+      } else {
+        throw new Error("No checkout URL returned");
+      }
+    } catch (err: any) {
+      console.error("Checkout error:", err);
+      toast({ title: "Something went wrong. Please try again.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
     }
-    if (cardDigits.length < 13 || cardDigits.length > 16) {
-      toast({ title: "Please enter a valid card number", variant: "destructive" });
-      return;
-    }
-    const expiryDigits = paymentData.expiry.replace("/", "");
-    if (expiryDigits.length !== 4) {
-      toast({ title: "Please enter a valid expiry date (MM/YY)", variant: "destructive" });
-      return;
-    }
-    if (paymentData.cvv.length < 3 || paymentData.cvv.length > 4) {
-      toast({ title: "Please enter a valid CVV", variant: "destructive" });
-      return;
-    }
-    setStep("success");
-    toast({ title: "Thank you for your generosity! 🌳", description: "The Pandey family sends their deepest gratitude." });
-  };
-
-  const resetFlow = () => {
-    setSelectedPlan(null);
-    setStep("plans");
-    setFormData({ name: "", email: "", dedication: "" });
-    setPaymentData({ cardName: "", cardNumber: "", expiry: "", cvv: "" });
   };
 
   const inputClass =
@@ -169,7 +151,7 @@ const DonationSection = () => {
           ))}
         </div>
 
-        {/* Step: Details form */}
+        {/* Step: Details form → then redirect to Stripe */}
         {step === "details" && selectedPlanData && (
           <div className="max-w-lg mx-auto bg-background rounded-2xl p-8 border border-border shadow-lg animate-fade-in-up">
             <h3 className="font-serif text-2xl font-bold text-foreground mb-2 text-center">
@@ -214,119 +196,19 @@ const DonationSection = () => {
               </div>
               <button
                 type="submit"
-                className="w-full bg-gradient-forest text-primary-foreground font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity"
+                disabled={isLoading}
+                className="w-full bg-gradient-forest text-primary-foreground font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Continue to Payment →
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Redirecting to checkout…
+                  </>
+                ) : (
+                  "Continue to Payment →"
+                )}
               </button>
             </form>
-          </div>
-        )}
-
-        {/* Step: Simulated Payment */}
-        {step === "payment" && selectedPlanData && (
-          <div className="max-w-lg mx-auto bg-background rounded-2xl p-8 border border-border shadow-lg animate-fade-in-up">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <CreditCard className="h-6 w-6 text-primary" />
-              <h3 className="font-serif text-2xl font-bold text-foreground">
-                Simulated Checkout
-              </h3>
-            </div>
-            <p className="text-muted-foreground text-sm text-center mb-1">
-              {selectedPlanData.name} — <span className="font-semibold text-primary">{selectedPlanData.price}</span>
-            </p>
-            <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground mb-6">
-              <Lock className="h-3 w-3" />
-              <span>This is a simulated payment — no real charges</span>
-            </div>
-
-            <form onSubmit={handlePaymentSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Cardholder Name *</label>
-                <input
-                  type="text"
-                  value={paymentData.cardName}
-                  onChange={(e) => setPaymentData({ ...paymentData, cardName: e.target.value })}
-                  className={inputClass}
-                  placeholder="Name on card"
-                  maxLength={100}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Card Number *</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={paymentData.cardNumber}
-                  onChange={(e) => setPaymentData({ ...paymentData, cardNumber: formatCardNumber(e.target.value) })}
-                  className={inputClass}
-                  placeholder="1234 5678 9012 3456"
-                  maxLength={19}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Expiry *</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={paymentData.expiry}
-                    onChange={(e) => setPaymentData({ ...paymentData, expiry: formatExpiry(e.target.value) })}
-                    className={inputClass}
-                    placeholder="MM/YY"
-                    maxLength={5}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">CVV *</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={paymentData.cvv}
-                    onChange={(e) => setPaymentData({ ...paymentData, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })}
-                    className={inputClass}
-                    placeholder="123"
-                    maxLength={4}
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-gradient-forest text-primary-foreground font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity"
-              >
-                Complete Donation 🌳
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep("details")}
-                className="w-full text-muted-foreground text-sm hover:text-foreground transition-colors"
-              >
-                ← Back to details
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* Step: Success */}
-        {step === "success" && selectedPlanData && (
-          <div className="max-w-lg mx-auto bg-background rounded-2xl p-8 border border-border shadow-lg text-center animate-fade-in-up">
-            <div className="text-5xl mb-4">🌳</div>
-            <h3 className="font-serif text-2xl font-bold text-foreground mb-2">
-              Thank You, {formData.name}!
-            </h3>
-            <p className="text-muted-foreground mb-4">
-              Your {selectedPlanData.name} donation means the world to us and to the planet. The Pandey family sends their deepest gratitude. 💚
-            </p>
-            {formData.dedication && (
-              <p className="italic text-primary border-t border-border pt-4 mt-4">
-                "{formData.dedication}"
-              </p>
-            )}
-            <button
-              onClick={resetFlow}
-              className="mt-6 text-sm text-muted-foreground hover:text-primary transition-colors underline"
-            >
-              Make another donation
-            </button>
           </div>
         )}
       </div>

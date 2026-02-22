@@ -1,1 +1,4 @@
 project_id = "bwokaxxjntmhqvtdqsra"
+
+[functions.create-donation-checkout]
+verify_jwt = false
