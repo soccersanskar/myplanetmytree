@@ -8,10 +8,11 @@ export default defineConfig({
     cssInjectedByJsPlugin()
   ],
   build: {
+    target: 'esnext',
     rollupOptions: {
       output: {
         manualChunks: undefined,
-        entryFileNames: `my-planet-app.js`, // The name of the file Wix will use
+        entryFileNames: `my-planet-app.js`,
       },
     },
   },
